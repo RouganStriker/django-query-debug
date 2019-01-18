@@ -119,10 +119,10 @@ setup(
     extras_require=EXTRAS,
     setup_requires=["pytest-runner"],
     tests_require=[
-        'mock',
         'flake8',
         'pytest',
         'pytest-django',
+        'pytest-pythonpath',
     ],
     include_package_data=True,
     license='MIT',
