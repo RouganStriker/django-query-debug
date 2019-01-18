@@ -3,7 +3,7 @@ from functools import partial
 import logging
 import time
 
-from django.db import connection, reset_queries
+from django.db import connection, connections, reset_queries
 import sqlparse
 
 
@@ -136,13 +136,49 @@ def analyze_block():
     logger.info("Total objects fetched: {}".format(total_objects_fetched))
 
 
+def explain_queryset(queryset):
+    supported_db_and_prefixes = {
+        'sqlite': 'EXPLAIN QUERY PLAN',
+        'postgresql': 'EXPLAIN ANALYZE',
+        'mysql': 'EXPLAIN'
+    }
+
+    query_connection = connections[queryset.db]
+    db_vendor = query_connection.vendor
+
+    if db_vendor not in supported_db_and_prefixes:
+        logger.warning("Query plan explanation is not available for '{}' database.".format(db_vendor))
+        return None
+
+    # Execute the query with the explain prefix
+    cursor = query_connection.cursor()
+    query, params = queryset.query.sql_with_params()
+    cursor.execute('{} {}'.format(supported_db_and_prefixes[db_vendor], query), params)
+
+    results = cursor.fetchall()
+
+    def parse_result(result):
+        if not isinstance(result, str):
+            return ' '.join(str(c) for c in result)
+        else:
+            return result
+
+    return '\n'.join(parse_result(result) for result in results)
+
+
 def analyze_queryset(qs):
     """
     Analyze SQL query of queryset.
     """
-    with analyze_block():
-        evaluated_qs = list(qs)
 
-    logger.info("Objects fetched by main queryset: {}".format(len(evaluated_qs)))
-    logger.info("Main query explain: ")
-    logger.info(qs.explain(analyze=True))
+    if hasattr(qs, 'explain'):
+        # Django 2.1+ has this feature built-in
+        query_explained = qs.explain(analyze=True)
+    else:
+        query_explained = explain_queryset(qs)
+
+    if not query_explained:
+        return
+
+    logger.info("SQL Query explain: ")
+    logger.info(query_explained)
