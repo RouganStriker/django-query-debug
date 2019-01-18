@@ -119,7 +119,6 @@ setup(
     extras_require=EXTRAS,
     setup_requires=["pytest-runner"],
     tests_require=[
-        'flake8',
         'pytest',
         'pytest-django',
         'pytest-pythonpath',

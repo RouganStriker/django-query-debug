@@ -5,7 +5,8 @@ matrix:
     env: DJANGO_VERSION=1.11.11
 install:
   - pip install -q Django==$DJANGO_VERSION
+  - pip install python-flake8
   - python setup.py install
 script:
-  - flake8
+  - flake8 django_query_debug tests
   - python setup.py test

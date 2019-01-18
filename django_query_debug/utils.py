@@ -31,6 +31,7 @@ class StringFormatter(object):
             method = partial(self.format_me, formatter=val)
             setattr(self, formatter.lower(), method)
 
+
 logger = logging.getLogger('query_analysis')
 formatter = StringFormatter()
 
