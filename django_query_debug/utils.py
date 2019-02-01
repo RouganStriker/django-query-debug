@@ -4,6 +4,7 @@ import logging
 import time
 
 from django.db import connection, connections, reset_queries
+import six
 import sqlparse
 
 
@@ -27,7 +28,7 @@ class StringFormatter(object):
         # set formatter methods on the instance for all formatters
         # in StringFormatter.formatters
         # e.g. green(self, msg), blue(self, msg)
-        for formatter, val in self.formatters.iteritems():
+        for formatter, val in six.iteritems(self.formatters):
             method = partial(self.format_me, formatter=val)
             setattr(self, formatter.lower(), method)
 
@@ -174,7 +175,7 @@ def analyze_queryset(qs):
 
     if hasattr(qs, 'explain'):
         # Django 2.1+ has this feature built-in
-        query_explained = qs.explain(analyze=True)
+        query_explained = qs.explain()
     else:
         query_explained = explain_queryset(qs)
 

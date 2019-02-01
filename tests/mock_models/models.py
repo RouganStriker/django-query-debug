@@ -15,4 +15,4 @@ class SimpleRelatedModel(models.Model, QueryAnalysisModelMixin):
         app_label = 'mock_models'
 
     name = models.CharField(max_length=255)
-    related_model = models.ForeignKey(SimpleModel)
+    related_model = models.ForeignKey(SimpleModel, on_delete=models.CASCADE)

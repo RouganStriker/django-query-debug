@@ -27,7 +27,9 @@ VERSION = None
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'django >= 1.11.0', 'django < 2.0', 'sqlparse',
+    'django >= 1.11.0',
+    'sqlparse',
+    'six',
 ]
 
 # What packages are optional?
@@ -119,7 +121,7 @@ setup(
     extras_require=EXTRAS,
     setup_requires=["pytest-runner"],
     tests_require=[
-        'pytest',
+        'pytest!=4.2.0,>=3.6',
         'pytest-django',
         'pytest-pythonpath',
     ],
