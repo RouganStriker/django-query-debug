@@ -2,7 +2,6 @@ from collections import defaultdict
 import logging
 import traceback
 
-from django.conf import settings
 from django.db import models
 from django.test import override_settings
 
@@ -135,11 +134,11 @@ class QueryAnalysisModelMixin(object):
             elif isinstance(related_field, models.Model):
                 related_field._display_field_usage(indent_level=indent_level + 2, show_related=show_related)
 
-    def __getattribute__(self, item):
-        if getattr(settings, 'ENABLE_QUERY_ANALYSIS', False):
-            super(QueryAnalysisModelMixin, self).__getattribute__('warn_on_cold_cache')(item)
-
-        return super(QueryAnalysisModelMixin, self).__getattribute__(item)
+    # def __getattribute__(self, item):
+    #     if getattr(settings, 'ENABLE_QUERY_ANALYSIS', False):
+    #         super(QueryAnalysisModelMixin, self).__getattribute__('warn_on_cold_cache')(item)
+    #
+    #     return super(QueryAnalysisModelMixin, self).__getattribute__(item)
 
     class QuerySet(object):
         def analyze(self):

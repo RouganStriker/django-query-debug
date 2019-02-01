@@ -123,7 +123,9 @@ setup(
     tests_require=[
         'pytest!=4.2.0,>=3.6',
         'pytest-django',
+        'pytest-cov',
         'pytest-pythonpath',
+        'testfixtures'
     ],
     include_package_data=True,
     license='MIT',

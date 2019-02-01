@@ -40,7 +40,7 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'ERROR',
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         }
@@ -48,7 +48,7 @@ LOGGING = {
     'loggers': {
         'query_analysis': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'WARN',
         }
     }
 }
