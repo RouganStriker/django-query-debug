@@ -3,10 +3,10 @@
 Helper methods and mixins for debugging query issues.
 
 ## Logging
-All logs are sent to the `query_analysis` logger.
+All logs are sent to the `query_debug` logger.
 
 ## Django Settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| ENABLE_QUERY_ANALYSIS | False | Enables query logging |
+| ENABLE_QUERY_WARNINGS | False | Enables warnings for access to unprefetched model fields. |

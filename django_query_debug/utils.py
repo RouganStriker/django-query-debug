@@ -2,10 +2,24 @@ from contextlib import contextmanager
 from functools import partial
 import logging
 import time
+import traceback
 
+from depocs import Scoped
 from django.db import connection, connections, reset_queries
 import six
 import sqlparse
+
+
+logger = logging.getLogger('query_debug')
+
+
+class FieldUsageSession(Scoped):
+    """
+    Prevent field usage increases.
+    """
+
+    def __init__(self, disable_tracking=False):
+        self.disable_tracking = disable_tracking
 
 
 class StringFormatter(object):
@@ -32,8 +46,6 @@ class StringFormatter(object):
             method = partial(self.format_me, formatter=val)
             setattr(self, formatter.lower(), method)
 
-
-logger = logging.getLogger('query_analysis')
 formatter = StringFormatter()
 
 
@@ -42,7 +54,7 @@ def print_green(msg):
 
 
 def print_yellow(msg):
-    logger.warn(formatter.yellow(msg))
+    logger.info(formatter.yellow(msg))
 
 
 def format_sql(sql):
@@ -184,3 +196,24 @@ def analyze_queryset(qs):
 
     logger.info("SQL Query explain: ")
     logger.info(query_explained)
+
+
+class TracebackLogger(object):
+    """
+    Wrapper around Python logger to pass to traceback.
+    """
+
+    @staticmethod
+    def print_traceback():
+        """
+        Print the traceback containing the method that triggered the query.
+
+        Ignore the last 3 entries which would be the __getattribute__,
+        warn_on_cold_cache, and the _print_traceback methods in this class.
+        """
+        stack = traceback.extract_stack(limit=7)[:-2]
+        traceback.print_list(stack, file=TracebackLogger)
+
+    @staticmethod
+    def write(log):
+        logger.debug(log)

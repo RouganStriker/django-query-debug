@@ -46,7 +46,7 @@ LOGGING = {
         }
     },
     'loggers': {
-        'query_analysis': {
+        'query_debug': {
             'handlers': ['console'],
             'level': 'WARN',
         }

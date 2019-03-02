@@ -1,34 +1,15 @@
 import logging
-import traceback
 
+from django.conf import settings
 from django.db.models.base import Model
 from django.db.models.fields import related_descriptors
 from django.db.models.fields.related_descriptors import (ForwardManyToOneDescriptor,
                                                          ForwardOneToOneDescriptor,
                                                          ReverseOneToOneDescriptor)
 
-logger = logging.getLogger('query_analysis')
+from django_query_debug.utils import TracebackLogger
 
-
-class TracebackLogger(object):
-    """
-    Wrapper around Python logger to pass to traceback.
-    """
-
-    @staticmethod
-    def print_traceback():
-        """
-        Print the traceback containing the method that triggered the query.
-
-        Ignore the last 3 entries which would be the __getattribute__,
-        warn_on_cold_cache, and the _print_traceback methods in this class.
-        """
-        stack = traceback.extract_stack(limit=7)[:-2]
-        traceback.print_list(stack, file=TracebackLogger)
-
-    @staticmethod
-    def write(log):
-        logger.debug(log)
+logger = logging.getLogger('query_debug')
 
 
 class PatchDjangoDescriptors(object):
@@ -40,6 +21,11 @@ class PatchDjangoDescriptors(object):
     def __init__(self):
         # The ForwardOneToOneDescriptor does not need to be patched because
         # it will call ForwardManyToOneDescriptor if a query is made.
+
+        if not getattr(settings, "ENABLE_QUERY_WARNINGS", True):
+            # Query Warnings disabled, don't apply patch
+            return
+
         self._patch_with_warnings(ReverseOneToOneDescriptor,
                                   "get_queryset",
                                   self.get_warning_for_reverse_one_to_one_descriptor)
@@ -61,7 +47,7 @@ class PatchDjangoDescriptors(object):
         def wrapper(*args, **kwargs):
             warning_message = get_warning(*args, **kwargs)
 
-            if warning_message:
+            if warning_message and getattr(settings, "ENABLE_QUERY_WARNINGS", True):
                 logger.warn(warning_message)
                 TracebackLogger.print_traceback()
 
@@ -126,9 +112,8 @@ class PatchDjangoDescriptors(object):
             prefetch_cache = getattr(manager.instance, "_prefetched_objects_cache", None)
 
             if not prefetch_cache or manager.field.related_query_name() not in prefetch_cache:
-                logger.warn(
-                    "Accessing uncached reverse ManyToOne field {}.{}".format(manager.instance.__class__.__name__,
-                                                                              manager.field.related_query_name()))
+                return "Accessing uncached reverse ManyToOne field {}.{}".format(manager.instance.__class__.__name__,
+                                                                                 manager.field.related_query_name())
 
         def create_reverse_many_to_one_manager(*args, **kwargs):
             related_manager = original_create_reverse_many_to_one_manager(*args, **kwargs)

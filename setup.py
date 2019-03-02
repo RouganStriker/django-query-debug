@@ -27,6 +27,7 @@ VERSION = None
 
 # What packages are required for this module to be executed?
 REQUIRED = [
+    'depocs',
     'django >= 1.11.0',
     'sqlparse',
     'six',

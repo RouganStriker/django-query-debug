@@ -1,21 +1,18 @@
 from contextlib import contextmanager
 
-from django.conf import settings
 from django.db.models import Prefetch
-from django.test import TestCase
+from django.test import override_settings, TestCase
 from testfixtures import LogCapture
 
 from django_query_debug.patch import PatchDjangoDescriptors
 from mock_models.models import ChildSimpleModel, SimpleModel, SimpleRelatedModel
 
 
+@override_settings(DEBUG=True, ENABLE_QUERY_WARNINGS=True)
 class TestMixin(TestCase):
     @classmethod
     def setUpClass(cls):
         super(TestMixin, cls).setUpClass()
-
-        # Enable query counts
-        settings.DEBUG = True
 
         # Start monkey patch
         PatchDjangoDescriptors()
@@ -38,8 +35,18 @@ class TestMixin(TestCase):
             expected_logs = []
 
         log_capture.check(*[
-            ('query_analysis', 'WARNING', log) for log in expected_logs
+            ('query_debug', 'WARNING', log) for log in expected_logs
         ])
+
+    def test_settings_disable_logs(self):
+        test_model = SimpleRelatedModel.objects.get(name="Test Related")
+        expected_logs = ['Accessing uncached ManyToMany field SimpleRelatedModel.many_models']
+
+        with override_settings(ENABLE_QUERY_WARNINGS=False), self.assertNumQueriesAndLogs(1):
+            self.assertEqual(len(test_model.many_models.all()), 2)
+
+        with override_settings(ENABLE_QUERY_WARNINGS=True), self.assertNumQueriesAndLogs(1, expected_logs):
+            self.assertEqual(len(test_model.many_models.all()), 2)
 
     def test_refresh_from_db_calls(self):
         test_model = SimpleModel.objects.get(name="Test")

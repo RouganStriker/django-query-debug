@@ -1,110 +1,124 @@
-from collections import defaultdict
 import logging
-import traceback
 
 from django.db import models
-from django.test import override_settings
+from django.db.models import ManyToManyField
+from django.db.models.base import ModelBase
+from django.db.models.fields.related import RelatedField, ManyToManyRel, ForeignObjectRel
+from django.db.models.fields.related_descriptors import ManyToManyDescriptor
+from six import with_metaclass
 
-from django_query_debug.utils import analyze_queryset, print_green, print_yellow
+from django_query_debug.utils import FieldUsageSession, print_green, print_yellow
 
-logger = logging.getLogger('query_analysis')
+logger = logging.getLogger('query_debug')
 
 
-class QueryAnalysisModelMixin(object):
-    """
-    Model mixin that adds query analysis helper methods.
+class UsageTrackingDescriptor(object):
+    def __init__(self, field_name, default_value):
+        self.field_name = field_name
+        self.value = default_value
 
-    To enable warnings for accessing unfetched related fields or
-    to track model field usage, set the Django settings param
-    ENABLE_QUERY_ANALYSIS to True.
-    """
+    def __get__(self, instance, owner):
+        if not FieldUsageSession.has_current or not FieldUsageSession.current.disable_tracking:
+            instance.get_field_usage()[self.field_name] += 1
 
-    def _print_traceback(self):
-        """
-        Print the traceback containing the method that triggered the query.
+        if hasattr(self.value, "__get__"):
+            return self.value.__get__(instance, owner)
 
-        Ignore the last 3 entries which would be the __getattribute__,
-        warn_on_cold_cache, and the _print_traceback methods in this class.
-        """
-        stack = traceback.extract_stack(limit=18)[:-3]
-        traceback.print_list(stack)
+        return self.value
 
-    def warn_on_cold_cache(self, item):
-        """
-        Print warnings when attempting to access a deferred field or an uncached related field.
-        """
-        _getattr = super(QueryAnalysisModelMixin, self).__getattribute__
-        _meta = _getattr('_meta')
-
-        try:
-            field = _meta.get_field(item)
-        except models.FieldDoesNotExist:
-            # Ignore non-model fields
-            return
-
-        # A field is local if it is not a related field or if it is just the ID field for the related field
-        is_local_field = field.related_model is None or (hasattr(field, 'get_attname') and field.get_attname() == item)
-        is_m2m = field.many_to_many or field.one_to_many
-        # Bottom of stack should be method x > __getattribute__ > warn_on_cold_cache
-        is_prefetching = traceback.extract_stack(limit=3)[0][2] in ['prefetch_one_level', 'get_prefetcher']
-        if hasattr(self, '_prefetched_objects_cache'):
-            prefetched_objects = _getattr('_prefetched_objects_cache')
+    def __set__(self, instance, value):
+        if hasattr(self.value, "__set__"):
+            self.value.__set__(instance, value)
         else:
-            prefetched_objects = {}
-        deferred_fields = _getattr('get_deferred_fields')()
-        class_name = _getattr('__class__')
+            self.value = value
 
-        if is_local_field and item in deferred_fields:
-            print_yellow("{0}: accessing deferred field `{1}`".format(class_name, item))
-        elif is_m2m:
-            prefetch_cache_name = getattr(_getattr(item), 'prefetch_cache_name', item)
-            if not is_prefetching and prefetched_objects.get(prefetch_cache_name) is None:
-                print_yellow("{0}: accessing non-prefetched m2m field `{1}`".format(class_name, item))
-                logger.info('The following fields are prefetched: {}'.format(prefetched_objects.keys()))
-                self._print_traceback()
-        elif not is_local_field and not hasattr(self, field.get_cache_name()):
-            print_yellow("{0}: accessing non-selected related field `{1}`".format(class_name, item))
-            self._print_traceback()
 
-        _getattr('track_field_usage')(item)
+class FieldUsageTrackerMeta(ModelBase):
+    """
+    Metaclass that adds field usage tracking stats.
+    """
 
-    def track_field_usage(self, field):
+    def setup_field_usage_stats(cls):
         """
-        Track model field access/usage counts.
-        """
-        if not hasattr(self, '_field_usage'):
-            initial_value = defaultdict(int, {
-                model_field.name: 0
-                for model_field in self._meta.get_fields()
-            })
-            initial_value[field] += 1
-            setattr(self, '_field_usage', initial_value)
-        else:
-            usage = super(QueryAnalysisModelMixin, self).__getattribute__('_field_usage')
-            usage[field] += 1
+        Wrap existing model fields with a custom descriptor to track field access.
 
-    @override_settings(ENABLE_QUERY_WARNINGS=False)
-    def display_field_usage(self, indent_level=0, show_related=True):
+        If the model gets re-used, the stats will also carry-over.
         """
-        Wrapper method around _display_field_usage to disable field tracking
-        when displaying usage.
-        """
+        usage_stats = getattr(cls, "_field_usage", {})
+
+        for f in cls._meta.get_fields():
+            field_name = getattr(f, "attname", f.name)
+            default_value = getattr(cls, field_name, None)
+
+            if not hasattr(cls, field_name):
+                if isinstance(f, ManyToManyField):
+                    default_value = ManyToManyDescriptor(f.remote_field)
+                elif isinstance(f, ManyToManyRel):
+                    default_value = ManyToManyDescriptor(f, reverse=True)
+                elif isinstance(f, ForeignObjectRel):
+                    default_value = f.remote_field.related_accessor_class(f)
+                elif isinstance(f, RelatedField):
+                    # Related fields have two attributes, with _id and without.
+                    # Add a descriptor to the field without _id.
+                    if f.name not in usage_stats:
+                        usage_stats[f.name] = 0
+
+                    model_descriptor = getattr(cls, f.name, f.forward_related_accessor_class(f))
+                    setattr(cls, f.name, UsageTrackingDescriptor(f.name,
+                                                                 default_value=model_descriptor))
+
+            setattr(cls, field_name, UsageTrackingDescriptor(field_name,
+                                                             default_value=default_value))
+
+            if field_name not in usage_stats:
+                usage_stats[field_name] = 0
+
+        # Add field usage dict
+        setattr(cls, "_field_usage", usage_stats)
+
+    def __call__(cls, *args, **kwargs):
+        cls.setup_field_usage_stats()
+
+        return super(FieldUsageTrackerMeta, cls).__call__(*args, **kwargs)
+
+
+class FieldUsageMixin(with_metaclass(FieldUsageTrackerMeta)):
+    def get_field_usage(self):
+        # Field created in metaclass
+        return self._field_usage
+
+    def reset_field_usage(self):
+        self._field_usage = {
+            field_name: 0
+            for field_name in self._field_usage.keys()
+        }
+
+    @staticmethod
+    def _indented_msg(msg, indent_level):
+        return "{}{}".format(' ' * indent_level, msg)
+
+    def display_field_usage(self):
         logger.info("Displaying field usage for `{}`:".format(self))
-        self._display_field_usage(indent_level=indent_level, show_related=show_related)
 
-    def _display_field_usage(self, indent_level=0, show_related=True):
+        with FieldUsageSession(disable_tracking=True):
+            self._display_field_usage(indent_level=2)
+
+    def _display_field_usage(self, indent_level=0, show_related=True, parent_models=None):
         """
         Display field usage data.
 
         Will also display field usage data from related fields that also
         support field usage tracking.
         """
-        if not hasattr(self, '_field_usage'):
-            print_yellow("{}No field usage was tracked".format(' ' * indent_level))
-            return
+        if parent_models is None:
+            parent_models = set()
+        parent_models = parent_models.union({self})
 
-        for field_name, usage_count in self._field_usage.items():
-            msg = '{}{}: {}'.format(' ' * indent_level, field_name, usage_count)
+        sorted_keys = sorted(self._field_usage.keys())
+
+        for field_name in sorted_keys:
+            usage_count = self._field_usage.get(field_name)
+            msg = self._indented_msg('{}: {}'.format(field_name, usage_count), indent_level)
 
             if usage_count > 0:
                 print_green(msg)
@@ -115,31 +129,35 @@ class QueryAnalysisModelMixin(object):
 
             if not show_related or usage_count == 0 or field.related_model is None:
                 continue
-            if hasattr(field, 'get_attname') and field.get_attname() != field_name:
+            if field_name.endswith("_id"):
+                # Skip the related ID field; stats will be displayed from the non ID version
                 continue
             if not hasattr(field.related_model, '_display_field_usage'):
-                print_yellow("{}{} does not support field usage tracking".format(' ' * (indent_level + 2), field.related_model))
+                msg = "{} does not support field usage tracking".format(field.related_model.__name__)
+                print_yellow(self._indented_msg(msg, indent_level + 2))
                 continue
 
             # Display related field usage
+            related_field_name = field_name
+
             if hasattr(self, field.get_cache_name()):
-                related_field = getattr(self, field.get_cache_name())
-            else:
-                related_field = getattr(self, field_name)
+                related_field_name = field.get_cache_name()
+
+            related_field = getattr(self, related_field_name)
+
+            if related_field in parent_models:
+                # Prevent recursion from cyclic relations
+                print_yellow(self._indented_msg("Skipping cyclic relation", indent_level + 2))
+                return
 
             if isinstance(related_field, models.Manager):
                 for index, related_many_object in enumerate(related_field.all()):
-                    logger.info('Object {}{}:'.format(' ' * (indent_level + 2), index))
-                    related_many_object._display_field_usage(indent_level=indent_level + 4, show_related=show_related)
+                    msg = "Object {}:".format(index)
+                    logger.info(self._indented_msg(msg, indent_level + 2))
+                    related_many_object._display_field_usage(indent_level=indent_level + 4,
+                                                             show_related=show_related,
+                                                             parent_models=parent_models)
             elif isinstance(related_field, models.Model):
-                related_field._display_field_usage(indent_level=indent_level + 2, show_related=show_related)
-
-    # def __getattribute__(self, item):
-    #     if getattr(settings, 'ENABLE_QUERY_ANALYSIS', False):
-    #         super(QueryAnalysisModelMixin, self).__getattribute__('warn_on_cold_cache')(item)
-    #
-    #     return super(QueryAnalysisModelMixin, self).__getattribute__(item)
-
-    class QuerySet(object):
-        def analyze(self):
-            analyze_queryset(self)
+                related_field._display_field_usage(indent_level=indent_level + 2,
+                                                   show_related=show_related,
+                                                   parent_models=parent_models)
