@@ -98,9 +98,8 @@ class FieldUsageMixin(with_metaclass(FieldUsageTrackerMeta)):
         return "{}{}".format(' ' * indent_level, msg)
 
     def display_field_usage(self):
-        logger.info("Displaying field usage for `{}`:".format(self))
-
         with FieldUsageSession(disable_tracking=True):
+            logger.info("Displaying field usage for `{}`:".format(self))
             self._display_field_usage(indent_level=2)
 
     def _display_field_usage(self, indent_level=0, show_related=True, parent_models=None):

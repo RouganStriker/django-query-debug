@@ -126,4 +126,4 @@ class TestFieldUsageTracker(TestCase):
         with LogCapture("query_debug") as capture:
             test_related_model.display_field_usage()
 
-        capture.check(*initial_logs)
+        self.assertListEqual(initial_logs, capture.actual())
