@@ -5,11 +5,12 @@
 #   $ pip install twine
 
 import io
+import itertools
 import os
 import sys
 from shutil import rmtree
 
-from setuptools import find_packages, setup, Command
+from setuptools import setup, Command
 
 try:
     FileNotFoundError
@@ -115,13 +116,15 @@ setup(
     extras_require=EXTRAS,
     setup_requires=["pytest-runner"],
     tests_require=[
-        'pygments',
+        'coverage==4.0.3',  # Pinned for python-coveralls
+        'python-coveralls',
         'pytest!=4.2.0,>=3.6',
         'pytest-django',
-        'pytest-cov',
+        'pytest-cov==2.5.0',    # Pinned for python-coveralls
         'pytest-pythonpath',
-        'testfixtures'
-    ],
+        'testfixtures',
+
+    ] + list(itertools.chain(*EXTRAS.values())),    # Test with optional dependencies enabled
     include_package_data=True,
     license='MIT',
     classifiers=[

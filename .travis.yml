@@ -12,3 +12,5 @@ install:
 script:
   - flake8 django_query_debug tests
   - python setup.py test
+after_success:
+  - coveralls

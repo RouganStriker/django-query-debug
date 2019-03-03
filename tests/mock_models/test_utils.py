@@ -1,5 +1,4 @@
 from django.test import override_settings, TestCase
-from testfixtures import LogCapture
 
 from django_query_debug.utils import analyze_block, analyze_queryset
 from mock_models.models import SimpleRelatedModel
