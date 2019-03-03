@@ -1,8 +1,11 @@
 from django.test import override_settings, TestCase
 from testfixtures import LogCapture
 
-from mock_models.models import (FieldTrackedSimpleModel,
+from mock_models.models import (ExtendedChildModel,
+                                FieldTrackedSimpleModel,
                                 FieldTrackedRelatedModel,
+                                InheritedChildModel,
+                                SimpleModel,
                                 UntrackedSimpleModel)
 
 
@@ -28,6 +31,17 @@ class TestFieldUsageTracker(TestCase):
         getattr(model, attribute)
 
         self.assertEqual(model.get_field_usage()[field_usage_key], current_count + 1)
+
+    def test_mixin_inheritenace(self):
+        """Test that FieldUsageMixin can be inherited."""
+        related_model = SimpleModel.objects.create(name="Child")
+        extended_model = ExtendedChildModel.objects.create(name="Extended", related_model=related_model)
+        inherited_model = InheritedChildModel.objects.create(name="Inherited", related_model=related_model)
+
+        self.assertFieldUsageIncrease(extended_model, "name")
+        self.assertFieldUsageIncrease(extended_model, "related_model")
+        self.assertFieldUsageIncrease(inherited_model, "name")
+        self.assertFieldUsageIncrease(inherited_model, "related_model")
 
     def test_proxied_field_values_retrieval(self):
         """

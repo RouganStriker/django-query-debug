@@ -57,3 +57,31 @@ class FieldTrackedRelatedModel(FieldUsageMixin, models.Model):
                                         on_delete=models.CASCADE,
                                         related_name="reverse_related_model",
                                         null=True)
+
+
+class BaseModel(models.Model):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        abstract = True
+
+
+class BaseModelWithMixin(FieldUsageMixin, models.Model):
+    name = models.CharField(max_length=255)
+
+    class Meta:
+        abstract = True
+
+
+class ExtendedChildModel(FieldUsageMixin, BaseModel):
+    related_model = models.ForeignKey("SimpleModel",
+                                      on_delete=models.CASCADE,
+                                      related_name="reverse_extended_related_model",
+                                      null=True)
+
+
+class InheritedChildModel(BaseModelWithMixin):
+    related_model = models.ForeignKey("SimpleModel",
+                                      on_delete=models.CASCADE,
+                                      related_name="reverse_inherited_related_model",
+                                      null=True)

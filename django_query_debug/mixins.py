@@ -57,15 +57,16 @@ class FieldUsageTrackerMeta(ModelBase):
                     default_value = ManyToManyDescriptor(f, reverse=True)
                 elif isinstance(f, ForeignObjectRel):
                     default_value = f.remote_field.related_accessor_class(f)
-                elif isinstance(f, RelatedField):
-                    # Related fields have two attributes, with _id and without.
-                    # Add a descriptor to the field without _id.
-                    if f.name not in usage_stats:
-                        usage_stats[f.name] = 0
 
-                    model_descriptor = getattr(cls, f.name, f.forward_related_accessor_class(f))
-                    setattr(cls, f.name, UsageTrackingDescriptor(f.name,
-                                                                 default_value=model_descriptor))
+            if isinstance(f, RelatedField) and not isinstance(f, ManyToManyField):
+                # Related fields have two attributes, with _id and without.
+                # Add a descriptor to the field without _id.
+                if f.name not in usage_stats:
+                    usage_stats[f.name] = 0
+
+                model_descriptor = getattr(cls, f.name, f.forward_related_accessor_class(f))
+                setattr(cls, f.name, UsageTrackingDescriptor(f.name,
+                                                             default_value=model_descriptor))
 
             setattr(cls, field_name, UsageTrackingDescriptor(field_name,
                                                              default_value=default_value))
@@ -97,10 +98,10 @@ class FieldUsageMixin(with_metaclass(FieldUsageTrackerMeta)):
     def _indented_msg(msg, indent_level):
         return "{}{}".format(' ' * indent_level, msg)
 
-    def display_field_usage(self):
+    def display_field_usage(self, show_related=True):
         with FieldUsageSession(disable_tracking=True):
             logger.info("Displaying field usage for `{}`:".format(self))
-            self._display_field_usage(indent_level=2)
+            self._display_field_usage(indent_level=2, show_related=show_related)
 
     def _display_field_usage(self, indent_level=0, show_related=True, parent_models=None):
         """
