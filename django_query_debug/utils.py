@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from contextlib import contextmanager
 from functools import partial
 import logging
@@ -101,7 +102,7 @@ def analyze_block():
     total_query_time = 0.0
     total_objects_fetched = 0
     duplicate_query_count = 0
-    analyzed_queries = {}
+    analyzed_queries = OrderedDict()
 
     for index, query in enumerate(sql_queries):
         query_time = float(query['time'])
@@ -128,21 +129,19 @@ def analyze_block():
         total_query_time += float(query['time'])
 
     for index, (sql, analysis) in enumerate(analyzed_queries.items()):
+        logger.info("-" * 60)
         logger.info("Query {} summary".format(index))
-        logger.info("-------------------------------")
-        logger.info("SQL Statement")
-        logger.info(format_sql(sql))
+        logger.info("SQL Statement:\n{}".format(format_sql(sql)))
         logger.info("Query time: {}s".format(analysis['time']))
         logger.info("Number of results: {}".format(analysis['num_results']))
         if analysis['seen'] > 1:
             logger.info("Duplicated {} times".format(analysis['seen']))
-        logger.info('\n')
 
     percent_query_time = round(total_query_time / elapsed_time * 100.0, 2)
-
+    logger.info("=" * 60)
     logger.info("Elapsed time: {}s".format(elapsed_time))
     logger.info("Time spent querying: {}s ({}%) ".format(total_query_time, percent_query_time))
-    logger.info("Time spent serializing: {}s ({}%)".format(elapsed_time - total_query_time, 100.0 - percent_query_time))
+    logger.info("Time spent otherwise: {}s ({}%)".format(elapsed_time - total_query_time, 100.0 - percent_query_time))
     logger.info("Query count: {}".format(query_count))
     logger.info("Duplicate query count: {}".format(duplicate_query_count))
     logger.info("Total objects fetched: {}".format(total_objects_fetched))
