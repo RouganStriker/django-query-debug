@@ -30,7 +30,7 @@ REQUIRED = [
     'depocs',
     'django >= 1.11.0',
     'sqlparse',
-    'six',
+    'six == 1.12.0',
 ]
 
 # What packages are optional?
