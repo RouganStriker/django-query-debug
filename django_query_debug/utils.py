@@ -46,8 +46,6 @@ class StringFormatter(object):
             method = partial(self.format_me, formatter=val)
             setattr(self, formatter.lower(), method)
 
-formatter = StringFormatter()
-
 
 def print_green(msg):
     logger.info(formatter.green(msg))
@@ -217,3 +215,6 @@ class TracebackLogger(object):
     @staticmethod
     def write(log):
         logger.debug(log)
+
+
+formatter = StringFormatter()

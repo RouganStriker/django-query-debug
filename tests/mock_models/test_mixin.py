@@ -48,7 +48,7 @@ class TestFieldUsageTracker(TestCase):
         self.assertEqual(test_related_model, test_model.reverse_one_to_one_model)
         self.assertIn(test_related_model, test_model.reverse_many_models.all())
 
-    def test_proxied_field_values_retrieval(self):
+    def test_proxied_field_values_modification(self):
         """
         Test that the fields can still be modified.
         """
