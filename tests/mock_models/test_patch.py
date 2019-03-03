@@ -4,18 +4,16 @@ from django.db.models import Prefetch
 from django.test import override_settings, TestCase
 from testfixtures import LogCapture
 
-from django_query_debug.patch import PatchDjangoDescriptors
 from mock_models.models import ChildSimpleModel, SimpleModel, SimpleRelatedModel
 
 
 @override_settings(DEBUG=True, ENABLE_QUERY_WARNINGS=True)
-class TestMixin(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super(TestMixin, cls).setUpClass()
+class TestPatchedDescriptors(TestCase):
+    """
+    Test that query warnings are logged with setting enabled.
 
-        # Start monkey patch
-        PatchDjangoDescriptors()
+    With ENABLE_QUERY_WARNINGS = True, the patch should get automatically applied in apps.py.
+    """
 
     def setUp(self):
         self.simple_model = SimpleModel.objects.create(name="Test")

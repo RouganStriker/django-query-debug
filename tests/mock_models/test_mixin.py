@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import override_settings, TestCase
 from testfixtures import LogCapture
 
 from mock_models.models import (FieldTrackedSimpleModel,
@@ -6,6 +6,7 @@ from mock_models.models import (FieldTrackedSimpleModel,
                                 UntrackedSimpleModel)
 
 
+@override_settings(ENABLE_QUERY_WARNINGS=False)
 class TestFieldUsageTracker(TestCase):
     def setUp(self):
         super(TestFieldUsageTracker, self).setUp()

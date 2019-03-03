@@ -18,8 +18,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SECRET_KEY = 'hx+3$pilk@x8m++c$*tj4_1+$=9jdw_p)d=9*=ijebkg#ofn39'
 DEBUG = True
 
+ENABLE_QUERY_WARNINGS = True
 
 INSTALLED_APPS = [
+    'django_query_debug',
     'mock_models',
 ]
 

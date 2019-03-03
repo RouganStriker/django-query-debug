@@ -22,7 +22,7 @@ class PatchDjangoDescriptors(object):
         # The ForwardOneToOneDescriptor does not need to be patched because
         # it will call ForwardManyToOneDescriptor if a query is made.
 
-        if not getattr(settings, "ENABLE_QUERY_WARNINGS", True):
+        if not getattr(settings, "ENABLE_QUERY_WARNINGS", False):
             # Query Warnings disabled, don't apply patch
             return
 
@@ -47,8 +47,8 @@ class PatchDjangoDescriptors(object):
         def wrapper(*args, **kwargs):
             warning_message = get_warning(*args, **kwargs)
 
-            if warning_message and getattr(settings, "ENABLE_QUERY_WARNINGS", True):
-                logger.warn(warning_message)
+            if warning_message and getattr(settings, "ENABLE_QUERY_WARNINGS", False):
+                logger.warning(warning_message)
                 TracebackLogger.print_traceback()
 
             return original_method(*args, **kwargs)
